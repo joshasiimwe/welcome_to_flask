@@ -1,11 +1,17 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash, g
+from flask import Flask, render_template, redirect, url_for, request, session, flash
+from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
-import sqlite3
+#import sqlite3
 
 app = Flask(__name__)
 
-app.secret_key = "my precious"
-app.database = "sample.db"
+import os
+app.config.from_object(os.environ['APP_SETTINGS'])
+
+db = SQLAlchemy(app)
+
+from models import *
+
 
 def login_required(f):
 	@wraps(f)
@@ -14,22 +20,13 @@ def login_required(f):
 			return f(*args, **kwargs)
 		else:
 			flash('You need to login first.')
-			return redirect(url_for('login'))
+		return redirect(url_for('login'))
 	return wrap
 
 @app.route('/')
 @login_required
 def home():
-	g.db = connect_db()
-	cur = g.db.execute('select * from posts')
-	
-	posts = []
-	for row in cur.fetchall():
-		posts.append(dict(title=row[0], description=row[1]))
-
-	#posts = [dict(title=row[0], description=row[1]) for row in cur.fetchall()]
-	
-	g.db.close()
+	posts = db.session.query(BlogPost).all()
 	return render_template('index.html', posts=posts)
 
 @app.route('/welcome')
@@ -44,7 +41,7 @@ def login():
 			error = 'Invalid credentials. Please try again.'
 		else:
 			session['logged_in'] = True
-			flash('You were just logged in!')	
+			flash('You were just logged in!')
 			return redirect(url_for('home'))
 	return render_template('login.html', error=error)
 
@@ -55,8 +52,8 @@ def logout():
 	flash('You were just logged out!')
 	return redirect(url_for('welcome'))
 
-def connect_db():
-	return sqlite3.connect(app.database)
+#def connect_db():
+#	return sqlite3.connect(app.database)
 
 if __name__ == '__main__':
-	app.run(debug=True)
+	app.run()
